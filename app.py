@@ -39,11 +39,10 @@ st.title("\U0001F3C3 Real-Time Activity Recognition")
 st.markdown("Simulating real-time predictions using the UCI HAR dataset and a Random Forest model.")
 
 # Initialize session state
-if 'pred_counts' not in st.session_state:
-    st.session_state.pred_counts = {label: 0 for label in activity_labels.values()}
-
 if 'prediction_log' not in st.session_state:
     st.session_state.prediction_log = []
+if 'pred_timeline' not in st.session_state:
+    st.session_state.pred_timeline = pd.DataFrame(columns=["Time Step", "Activity"])
 
 # Start simulation
 if st.button("Start Simulation"):
@@ -55,9 +54,8 @@ if st.button("Start Simulation"):
         pred_label = activity_labels.get(prediction, "Unknown")
         true_label = activity_labels.get(actual, "Unknown")
 
-        # Track prediction
-        st.session_state.pred_counts[pred_label] += 1
         risk_status = "✅ Safe" if pred_label in safe_activities else "⚠️ Potential Risk"
+
         st.session_state.prediction_log.append({
             "Time Step": i + 1,
             "Predicted": pred_label,
@@ -65,21 +63,32 @@ if st.button("Start Simulation"):
             "Risk": risk_status
         })
 
-        # Create placeholders
-        status_placeholder = st.empty()
-        chart_placeholder = st.empty()
+        st.session_state.pred_timeline = pd.concat([
+            st.session_state.pred_timeline,
+            pd.DataFrame([{"Time Step": i + 1, "Activity": pred_label}])
+        ], ignore_index=True)
 
-        with status_placeholder.container():
+        # Display current prediction
+        with st.container():
             st.write(f"### Time Step {i+1}")
             st.metric("Predicted Activity", pred_label)
             st.metric("Actual Activity", true_label)
             st.markdown(f"**Risk Assessment:** {risk_status}")
 
-        # Update chart
-        pred_df = pd.DataFrame(list(st.session_state.pred_counts.items()), columns=["Activity", "Count"])
-        fig, ax = plt.subplots()
-        pred_df.plot(kind='bar', x='Activity', y='Count', ax=ax, legend=False, color='skyblue')
-        chart_placeholder.pyplot(fig)
+        # Display live activity timeline
+        timeline_df = st.session_state.pred_timeline.copy()
+        activity_order = list(activity_labels.values())
+        label_map = {label: i for i, label in enumerate(activity_order)}
+        timeline_df["Activity Code"] = timeline_df["Activity"].map(label_map)
+
+        fig, ax = plt.subplots(figsize=(10, 3))
+        ax.plot(timeline_df["Time Step"], timeline_df["Activity Code"], marker='o', linestyle='-')
+        ax.set_yticks(range(len(activity_order)))
+        ax.set_yticklabels(activity_order)
+        ax.set_xlabel("Time Step")
+        ax.set_ylabel("Activity")
+        ax.set_title("Real-Time Activity Timeline")
+        st.pyplot(fig)
 
         time.sleep(0.5)
 
@@ -87,8 +96,8 @@ if st.button("Start Simulation"):
 if st.session_state.prediction_log:
     df_log = pd.DataFrame(st.session_state.prediction_log)
     st.download_button(
-        label="Download Prediction Log as CSV",
+        label="📁 Download Prediction Log as CSV",
         data=df_log.to_csv(index=False).encode('utf-8'),
-        file_name='assets/har_prediction_log.csv',
+        file_name='har_prediction_log.csv',
         mime='text/csv'
     )
