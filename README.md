@@ -1,7 +1,7 @@
 # HAR-Simulation 🏃 
 ## A Real-Time Activity Recognition Dashboard
 
-Simulates real-time predictions using the UCI HAR Dataset and a trained Random Forest model. Built with Python and Streamlit.
+Simulates real-time predictions using the [UCI HAR Dataset](https://archive.ics.uci.edu/dataset/240/human+activity+recognition+using+smartphones) and a trained Random Forest model. Built with Python and Streamlit.
 
 ## Features
 - Live stream simulation of sensor data
