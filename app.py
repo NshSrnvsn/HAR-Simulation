@@ -17,6 +17,8 @@ activity_labels = {
     6: "LAYING"
 }
 
+safe_activities = ["SITTING", "STANDING", "LAYING"]
+
 # Load dataset
 dataset_path = "data/UCI HAR Dataset"
 features = pd.read_csv(f"{dataset_path}/features.txt", sep=r'\s+', header=None, names=["index", "feature"])
@@ -25,35 +27,53 @@ deduped_features = [f"{name}_{i}" for i, name in enumerate(feature_names)]
 X_test = pd.read_csv(f"{dataset_path}/test/X_test.txt", sep=r'\s+', header=None, names=deduped_features)
 y_test = pd.read_csv(f"{dataset_path}/test/y_test.txt", header=None, names=["Activity"])
 
+# Create a balanced dataset
+sample_df = y_test.copy()
+sample_df["idx"] = sample_df.index
+balanced_idxs = sample_df.groupby("Activity").sample(n=20, random_state=42)["idx"].tolist()
+X_balanced = X_test.loc[balanced_idxs].reset_index(drop=True)
+y_balanced = y_test.loc[balanced_idxs].reset_index(drop=True)
+
 # UI
-st.title("🏃 Real-Time Activity Recognition")
+st.title("\U0001F3C3 Real-Time Activity Recognition")
 st.markdown("Simulating real-time predictions using the UCI HAR dataset and a Random Forest model.")
 
 # Initialize session state
 if 'pred_counts' not in st.session_state:
     st.session_state.pred_counts = {label: 0 for label in activity_labels.values()}
 
+if 'prediction_log' not in st.session_state:
+    st.session_state.prediction_log = []
+
 # Start simulation
 if st.button("Start Simulation"):
-    for i in range(len(X_test)):
-        sample = X_test.iloc[i].values.reshape(1, -1)
+    for i in range(len(X_balanced)):
+        sample = X_balanced.iloc[i].values.reshape(1, -1)
         prediction = model.predict(sample)[0]
-        actual = y_test.iloc[i]['Activity']
-        
+        actual = y_balanced.iloc[i]['Activity']
+
         pred_label = activity_labels.get(prediction, "Unknown")
         true_label = activity_labels.get(actual, "Unknown")
 
+        # Track prediction
         st.session_state.pred_counts[pred_label] += 1
+        risk_status = "✅ Safe" if pred_label in safe_activities else "⚠️ Potential Risk"
+        st.session_state.prediction_log.append({
+            "Time Step": i + 1,
+            "Predicted": pred_label,
+            "Actual": true_label,
+            "Risk": risk_status
+        })
 
-        # Create placeholder areas
+        # Create placeholders
         status_placeholder = st.empty()
         chart_placeholder = st.empty()
 
-        # Display prediction info
         with status_placeholder.container():
             st.write(f"### Time Step {i+1}")
             st.metric("Predicted Activity", pred_label)
             st.metric("Actual Activity", true_label)
+            st.markdown(f"**Risk Assessment:** {risk_status}")
 
         # Update chart
         pred_df = pd.DataFrame(list(st.session_state.pred_counts.items()), columns=["Activity", "Count"])
@@ -62,3 +82,13 @@ if st.button("Start Simulation"):
         chart_placeholder.pyplot(fig)
 
         time.sleep(0.5)
+
+# Export log
+if st.session_state.prediction_log:
+    df_log = pd.DataFrame(st.session_state.prediction_log)
+    st.download_button(
+        label="Download Prediction Log as CSV",
+        data=df_log.to_csv(index=False).encode('utf-8'),
+        file_name='assets/har_prediction_log.csv',
+        mime='text/csv'
+    )
