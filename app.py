@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import joblib
 import time
-import matplotlib.pyplot as plt
 
 # Load the model
 model = joblib.load("har_model.pkl")
@@ -41,11 +40,17 @@ st.markdown("Simulating real-time predictions using the UCI HAR dataset and a Ra
 # Initialize session state
 if 'prediction_log' not in st.session_state:
     st.session_state.prediction_log = []
-if 'pred_timeline' not in st.session_state:
-    st.session_state.pred_timeline = pd.DataFrame(columns=["Time Step", "Activity"])
+if 'chart_df' not in st.session_state:
+    st.session_state.chart_df = pd.DataFrame(columns=["Activity Code"])
 
 # Start simulation
 if st.button("Start Simulation"):
+    activity_order = list(activity_labels.values())
+    label_map = {label: i for i, label in enumerate(activity_order)}
+
+    chart_placeholder = st.empty()
+    log_placeholder = st.empty()
+
     for i in range(len(X_balanced)):
         sample = X_balanced.iloc[i].values.reshape(1, -1)
         prediction = model.predict(sample)[0]
@@ -56,6 +61,7 @@ if st.button("Start Simulation"):
 
         risk_status = "✅ Safe" if pred_label in safe_activities else "⚠️ Potential Risk"
 
+        # Log the prediction
         st.session_state.prediction_log.append({
             "Time Step": i + 1,
             "Predicted": pred_label,
@@ -63,32 +69,17 @@ if st.button("Start Simulation"):
             "Risk": risk_status
         })
 
-        st.session_state.pred_timeline = pd.concat([
-            st.session_state.pred_timeline,
-            pd.DataFrame([{"Time Step": i + 1, "Activity": pred_label}])
-        ], ignore_index=True)
+        # Update line chart
+        activity_code = label_map[pred_label]
+        st.session_state.chart_df.loc[i] = [activity_code]
+        chart_placeholder.line_chart(st.session_state.chart_df)
 
-        # Display current prediction
-        with st.container():
-            st.write(f"### Time Step {i+1}")
-            st.metric("Predicted Activity", pred_label)
-            st.metric("Actual Activity", true_label)
-            st.markdown(f"**Risk Assessment:** {risk_status}")
-
-        # Display live activity timeline
-        timeline_df = st.session_state.pred_timeline.copy()
-        activity_order = list(activity_labels.values())
-        label_map = {label: i for i, label in enumerate(activity_order)}
-        timeline_df["Activity Code"] = timeline_df["Activity"].map(label_map)
-
-        fig, ax = plt.subplots(figsize=(10, 3))
-        ax.plot(timeline_df["Time Step"], timeline_df["Activity Code"], marker='o', linestyle='-')
-        ax.set_yticks(range(len(activity_order)))
-        ax.set_yticklabels(activity_order)
-        ax.set_xlabel("Time Step")
-        ax.set_ylabel("Activity")
-        ax.set_title("Real-Time Activity Timeline")
-        st.pyplot(fig)
+        # Display recent log entries
+        log_lines = [
+            f"**Step {row['Time Step']}** | Predicted: `{row['Predicted']}` | Actual: `{row['Actual']}` | Risk: {row['Risk']}"
+            for row in st.session_state.prediction_log[-10:]
+        ]
+        log_placeholder.markdown("\n".join(log_lines), unsafe_allow_html=True)
 
         time.sleep(0.5)
 
