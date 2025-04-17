@@ -12,7 +12,7 @@ Simulates real-time predictions using the [UCI HAR Dataset](https://archive.ics.
 - Built with: Python, Streamlit, scikit-learn, pandas
 
 ## 🎥 Demo
-![Demo](assets/demo.gif)
+![Demo](assets/demo.mov)
 
 ## Setup
 
